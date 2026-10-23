@@ -1,0 +1,22 @@
+{
+  "name": "GooHan Patch iOS 27 AirLift Native Link Test",
+  "version": "4.0-native-link-test",
+  "release_status": "NATIVE_LINK_PROOF_NOT_IOS27_PATCH_CAPABLE",
+  "tested": {
+    "linux_swift_coordinator_smoke": true,
+    "linux_swift_readiness_tests": true,
+    "linux_python_unit_tests": 12,
+    "xcode_ios_build": false,
+    "real_ios27_apply": false
+  },
+  "native_airlift_embedded": true,
+  "pairing_record_import": true,
+  "localdevvpn_auto_control": false,
+  "localdevvpn_user_confirmation": true,
+  "ios27_legacy_write_policy_unchanged": true,
+  "license_admin_preserved": true,
+  "native_airlift_write_provider": false,
+  "native_airlift_link_test": true,
+  "pairing_record_authenticated": false,
+  "ios27_write_enabled": false
+}
