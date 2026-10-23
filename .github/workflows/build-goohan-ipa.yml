@@ -1,0 +1,90 @@
+name: Build GooHan Patch experimental IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-iphone:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Restore compressed AirLift native library
+        run: python3 scripts/restore_airlift.py
+
+      - name: Verify GOHAN source and deleted patch resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f ThreeOneOSFive.xcodeproj/xcshareddata/xcschemes/GOHAN.xcscheme
+          test -f ThreeOneOSFive.xcodeproj/project.pbxproj
+          if find ThreeOneOSFive/Patches -type f -name '*.3105' -print -quit | grep -q .; then
+            echo 'ERROR: Bundled .3105 files still exist in source.' >&2
+            exit 1
+          fi
+          echo 'PASS: no bundled .3105 files; GOHAN scheme found'
+
+      - name: Verify dual-engine coordinator and iOS compatibility policy
+        shell: bash
+        run: bash tests/run_dualengine_smoke.sh
+
+      - name: Verify AirLift native link test sources
+        shell: bash
+        run: |
+          python3 tests/test_native_link_v4.py
+          python3 tests/test_web_upload_archive_v4_1.py
+          shasum -a 256 Frameworks/AirliftFFI.xcframework/ios-arm64/libairlift_ffi.a
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project ThreeOneOSFive.xcodeproj
+
+      - name: Build unsigned iPhone app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ThreeOneOSFive.xcodeproj \
+            -scheme GOHAN \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build
+
+      - name: Package IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$PWD/build/Build/Products/Release-iphoneos/GOHAN.app"
+          test -d "$APP" || { echo "GOHAN.app not found at $APP" >&2; exit 1; }
+          test -f "$APP/GOHAN" || { echo 'GOHAN executable missing' >&2; exit 1; }
+          mkdir -p "$PWD/dist/Payload"
+          ditto "$APP" "$PWD/dist/Payload/GOHAN.app"
+          cd dist
+          /usr/bin/zip -q -r -y GooHanPatch-experimental-unsigned.ipa Payload
+          /usr/bin/unzip -t GooHanPatch-experimental-unsigned.ipa | tail -n 2
+          if /usr/bin/unzip -Z1 GooHanPatch-experimental-unsigned.ipa | grep -E '\.3105$'; then
+            echo 'ERROR: Bundled .3105 remains in the IPA' >&2
+            exit 1
+          fi
+          shasum -a 256 GooHanPatch-experimental-unsigned.ipa > GooHanPatch-experimental-unsigned.ipa.sha256
+          echo 'PASS: GOHAN.app / GOHAN executable, no bundled .3105'
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: GooHanPatch-experimental-IPA
+          path: |
+            dist/GooHanPatch-experimental-unsigned.ipa
+            dist/GooHanPatch-experimental-unsigned.ipa.sha256
+          if-no-files-found: error
