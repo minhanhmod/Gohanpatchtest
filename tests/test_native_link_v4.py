@@ -5,7 +5,9 @@ assert 'AirliftFFI.xcframework in Frameworks' in p
 assert 'GHNativeFFIProbe.m in Sources' in p
 assert 'GHNativeFFIReadiness.swift in Sources' in p
 assert 'GHPairingVault.swift in Sources' in p
-assert 'HEADER_SEARCH_PATHS' in p
+# Xcode automatically publishes static XCFramework headers/module map in build Products/include.
+# Adding the source Headers dir here loads AirliftFFI module.modulemap twice.
+assert 'Frameworks/AirliftFFI.xcframework/ios-arm64/Headers' not in p
 assert 'NSLocalNetworkUsageDescription' in (root/'ThreeOneOSFive/Info.plist').read_text()
 c = (root/'ThreeOneOSFive/ContentView.swift').read_text()
 assert 'settingsNativeFFISection' in c and '.fileImporter(' in c
