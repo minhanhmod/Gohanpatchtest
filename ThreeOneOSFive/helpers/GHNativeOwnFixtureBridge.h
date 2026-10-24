@@ -5,7 +5,8 @@
 // No arbitrary bundle ID, file path or third-party write is accepted.
 // Return code 0 does NOT prove the file was updated; Swift verifies the digest.
 typedef void (^GHOwnFixtureWriteFinishedBlock)(BOOL nativeAccepted,
-                                                int32_t nativeReturnCode);
+                                                int32_t nativeReturnCode,
+                                                NSString * _Nonnull nativeErrorCategory);
 FOUNDATION_EXPORT void GHRunNativeOwnFixtureWrite(NSString *pairingPath,
                                                    NSString *fixtureRoot,
                                                    GHOwnFixtureWriteFinishedBlock finished);

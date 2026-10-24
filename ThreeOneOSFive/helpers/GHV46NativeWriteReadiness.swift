@@ -10,6 +10,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var resultCode = "V46_NOT_TESTED"
     @Published private(set) var nativeReturnCode = "NOT_RUN"
+    @Published private(set) var nativeErrorCategory = "NOT_RUN"
     @Published private(set) var baselineVerified = false
     @Published private(set) var backupVerified = false
     @Published private(set) var nativeWriteVerified = false
@@ -40,6 +41,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
         restoreVerified = false
         cleanupVerified = false
         nativeReturnCode = "NOT_RUN"
+        nativeErrorCategory = "NOT_RUN"
 
         let fm = FileManager.default
         let revision = vault.credentialRevision
@@ -89,7 +91,8 @@ final class GHV46NativeWriteReadiness: ObservableObject {
 
             // Native code rechecks the exact self-sandbox root and only accepts
             // stage/gh_v46_fixture.dat -> target/gh_v46_fixture.dat.
-            GHRunNativeOwnFixtureWrite(pairingPath, root.path) { [self] accepted, rc in
+            GHRunNativeOwnFixtureWrite(pairingPath, root.path) { [self] accepted, rc, errorCategory in
+                self.nativeErrorCategory = errorCategory
                 self.nativeReturnCode = String(rc)
                 // Verify the native writer has NOT replaced our destination with
                 // a symlink or redirected its parent before any Foundation write.
@@ -138,6 +141,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
          "Scope: OWN_APP_APPLICATION_SUPPORT_DISPOSABLE_FIXTURE_ONLY",
          "Writer: AIRLIFT_NATIVE_al_exploit_write_dir_SELF_ONLY",
          "Native rc: \(nativeReturnCode)",
+         "Native error class (redacted): \(nativeErrorCategory)",
          "Baseline verified: \(baselineVerified ? "yes" : "no")",
          "Backup verified: \(backupVerified ? "yes" : "no")",
          "Native replacement SHA verified: \(nativeWriteVerified ? "yes" : "no")",
