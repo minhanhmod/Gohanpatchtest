@@ -37,6 +37,8 @@ jobs:
         shell: bash
         run: |
           python3 tests/test_native_link_v4.py
+          python3 tests/test_native_pairing_v43.py
+          python3 tests/test_pairing_optional_callbacks_v431.py
           python3 tests/test_xcframework_module_wiring_v4_2.py
           python3 tests/test_web_upload_archive_v4_1.py
           shasum -a 256 Frameworks/AirliftFFI.xcframework/ios-arm64/libairlift_ffi.a
