@@ -84,6 +84,8 @@
 		DCA1000000000000000000F1 /* AirliftFFI.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000F1; };
 		DCA1000000000000000000B1 /* GHNativePairingBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000B1; };
 		DCA1000000000000000000B2 /* GHNativePairingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000B2; };
+        F45000000000000000000001 /* GHOwnSandboxTransactionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F45000000000000000000003; };
+        F45000000000000000000002 /* GHOwnSandboxTransactionReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = F45000000000000000000004; };
         DCA1000000000000000000C0 /* GHSessionAssessment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000C0; };
 /* End PBXBuildFile section */
 
@@ -186,6 +188,8 @@
 		DCB1000000000000000000B0 /* GHNativePairingBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GHNativePairingBridge.h; sourceTree = "<group>"; };
 		DCB1000000000000000000B1 /* GHNativePairingBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GHNativePairingBridge.m; sourceTree = "<group>"; };
 		DCB1000000000000000000B2 /* GHNativePairingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHNativePairingSession.swift; sourceTree = "<group>"; };
+        F45000000000000000000003 /* GHOwnSandboxTransactionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHOwnSandboxTransactionCore.swift; sourceTree = "<group>"; };
+        F45000000000000000000004 /* GHOwnSandboxTransactionReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHOwnSandboxTransactionReadiness.swift; sourceTree = "<group>"; };
         DCB1000000000000000000C0 /* GHSessionAssessment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHSessionAssessment.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -297,6 +301,8 @@
                 DCB1000000000000000000B0 /* GHNativePairingBridge.h */,
                 DCB1000000000000000000B1 /* GHNativePairingBridge.m */,
                 DCB1000000000000000000B2 /* GHNativePairingSession.swift */,
+                F45000000000000000000003 /* GHOwnSandboxTransactionCore.swift */,
+                F45000000000000000000004 /* GHOwnSandboxTransactionReadiness.swift */,
                 DCB1000000000000000000C0 /* GHSessionAssessment.swift */,
                 DCB1000000000000000000A1 /* GHNativeFFIProbe.m */,
 				3105B119 /* PatchProjectLibrary.swift */,
@@ -451,6 +457,8 @@
                 DCA1000000000000000000A1,
                 DCA1000000000000000000B1,
                 DCA1000000000000000000B2,
+                F45000000000000000000001,
+                F45000000000000000000002,
                 DCA1000000000000000000C0,
 				3105B219,
 				3105B220,

@@ -163,6 +163,7 @@ struct ContentView: View {
     @StateObject private var nativeFFITest = GHNativeFFIReadiness()
     @StateObject private var pairingVault = GHPairingVault()
     @StateObject private var pairingSession = GHNativePairingSession()
+    @StateObject private var ownSandboxTransaction = GHOwnSandboxTransactionReadiness()
     @State private var pairingFileImporter = false
     @StateObject private var localDevProbe = GHLocalDevProbe()
     @State private var game = "free_fire"
@@ -379,6 +380,7 @@ struct ContentView: View {
                     Divider()
                     settingsLocalDevSection
                     settingsNativeFFISection
+                    settingsTransactionSection
                     settingsBeta5ComparisonSection
                     settingsFinalGateSection
                     settingsDiagnosticsSection
@@ -539,6 +541,41 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private var settingsTransactionSection: some View {
+        Text("iOS 27 • Giao dịch thử nghiệm v4.5")
+            .font(.headline)
+        Text("Sau khi kiểm chứng phiên và container GooHan, chạy thử Backup → Write → Verify SHA-256 → Restore CHỈ trong Application Support của GooHan. Đây là ghi bằng Foundation, KHÔNG phải engine ghi AirLift.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+        Button(ownSandboxTransaction.isRunning ? "Đang thử giao dịch…" : "1. Backup → Write → Verify → Restore") {
+            ownSandboxTransaction.run()
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!v45SandboxPreconditionsReady || ownSandboxTransaction.isRunning)
+        Button("2. Giả lập lỗi sau Backup (kiểm thử rollback)") {
+            ownSandboxTransaction.run(fault: .afterVerifiedBackup)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!v45SandboxPreconditionsReady || ownSandboxTransaction.isRunning)
+        Button("3. Giả lập lỗi sau Write (kiểm thử rollback)") {
+            ownSandboxTransaction.run(fault: .afterReplacementWrite)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!v45SandboxPreconditionsReady || ownSandboxTransaction.isRunning)
+        Text("V4.5: " + ownSandboxTransaction.resultCode)
+            .font(.caption.monospaced())
+            .foregroundColor(.orange)
+            .textSelection(.enabled)
+        Text(ownSandboxTransaction.safeReport)
+            .font(.caption2.monospaced())
+            .foregroundColor(.secondary)
+            .textSelection(.enabled)
+        Text("Nếu nút bị khóa, chạy lại Session → Own Container ở phía trên. Thành công v4.5 KHÔNG chứng minh có quyền ghi container ứng dụng khác; AIRLIFT_PATCH_DRIVER_MISSING vẫn giữ nguyên.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+    }
+
+    @ViewBuilder
     private var settingsBeta5ComparisonSection: some View {
         Text("Đối chiếu với 3105 Beta 5 (cùng iPhone)")
             .font(.headline)
@@ -566,11 +603,16 @@ struct ContentView: View {
         Text("Đã bổ sung rc0 + event và phép thử tra cứu chính container. Chưa có AirLift Patch Driver hoặc Restore được xác minh. Không ghi trên iOS 27.")
             .font(.caption2)
             .foregroundColor(.secondary)
-        Button("Sao chép báo cáo v4.4") {
+        Button("Sao chép báo cáo v4.5") {
             UIPasteboard.general.string = engineDiagnosticsReport()
         }
         .buttonStyle(.borderedProminent)
         .tint(color)
+    }
+
+    private var v45SandboxPreconditionsReady: Bool {
+        pairingSession.sessionValid(for: pairingVault)
+            && pairingSession.ownContainerCode == "NATIVE_OWN_CONTAINER_READ_ONLY_OK"
     }
 
     /// Native read-only checks take precedence over older manual/TCP
@@ -637,8 +679,9 @@ struct ContentView: View {
             + "\nNative AirLift FFI link-only test: " + nativeFFITest.statusCode
             + "\nPairing local vault: " + pairingVault.statusCode
             + "\n" + pairingSession.safeReport(for: pairingVault)
+            + "\n" + ownSandboxTransaction.safeReport
             + "\nV4.4 readiness gate: " + v44ReadinessGate
-            + "\nV4.4 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
+            + "\nV4.5 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
             + "\nV3.3 legacy TCP comparison only (not v4.4 blocker):\n" + finalGate.report
             + "\n" + localDevReadinessReport
             + "\nTrạng thái quyền truy cập (phiên): " + appState.exploitStatus.displayText

@@ -1,13 +1,14 @@
 {
-  "name": "GooHan Patch iOS 27 AirLift Native Link Test",
-  "version": "4.0-native-link-test",
-  "release_status": "NATIVE_LINK_PROOF_NOT_IOS27_PATCH_CAPABLE",
+  "name": "GooHan Patch iOS 27 Own-Sandbox Transaction Test",
+  "version": "4.5-self-sandbox-transaction-test",
+  "release_status": "DIAGNOSTIC_ONLY_NOT_NATIVE_AIRLIFT_PATCH_CAPABLE",
   "tested": {
     "linux_swift_coordinator_smoke": true,
     "linux_swift_readiness_tests": true,
     "linux_python_unit_tests": 12,
     "xcode_ios_build": false,
-    "real_ios27_apply": false
+    "real_ios27_apply": false,
+    "linux_swift_transaction_tests": true
   },
   "native_airlift_embedded": true,
   "pairing_record_import": true,
@@ -18,5 +19,8 @@
   "native_airlift_write_provider": false,
   "native_airlift_link_test": true,
   "pairing_record_authenticated": false,
-  "ios27_write_enabled": false
+  "ios27_write_enabled": false,
+  "v45_own_sandbox_sha256_transaction": true,
+  "v45_own_sandbox_fault_injection_rollback": true,
+  "v45_native_airlift_write_verified": false
 }
