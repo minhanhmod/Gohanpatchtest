@@ -43,6 +43,7 @@ jobs:
           python3 tests/test_own_sandbox_v45.py
           python3 tests/test_native_own_fixture_v46.py
           python3 tests/test_native_error_class_v461.py
+          python3 tests/test_native_error_class_v462.py
           swiftc -swift-version 5 ThreeOneOSFive/helpers/GHV46NativeWriteAssessment.swift tests/GHV46NativeWriteAssessmentTests.swift -o /tmp/gh_native_v46_assessment
           /tmp/gh_native_v46_assessment
           swiftc -swift-version 5 ThreeOneOSFive/helpers/GHOwnSandboxTransactionCore.swift tests/GHOwnSandboxTransactionCoreTests.swift -o /tmp/gh_own_sandbox_v45
