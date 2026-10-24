@@ -92,8 +92,8 @@ enum GHInstalledPatchEngine {
         }
         let airliftTag = airLiftReady
             ? "đã đăng ký nhà cung cấp (cần xác minh trên thiết bị)"
-            : "chưa tích hợp native"
-        return "iOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) | build \(build)\(systemTag) | engine cũ đã xác minh: \(supported ? "có" : "không") | AirLift: \(airliftTag) | Pair File: chưa hỗ trợ trong GooHan hiện tại"
+            : "chưa tích hợp Patch Driver (FFI đã liên kết)"
+        return "iOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion) | build \(build)\(systemTag) | engine cũ đã xác minh: \(supported ? "có" : "không") | AirLift: \(airliftTag) | Pair File: lưu cục bộ/ghép đôi thử nghiệm; chưa dùng để Patch"
     }
 
     static func diagnosticsText() -> String {

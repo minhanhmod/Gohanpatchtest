@@ -459,16 +459,16 @@ struct ContentView: View {
         Link("Tạo File Pair bằng idevice_pair (dành cho 3105 Beta 5)",
              destination: URL(string: "https://github.com/jkcoxson/idevice_pair")!)
             .font(.caption)
-        Text("File Pair là dữ liệu ghép đôi nhạy cảm. Không đăng tải lên GitHub, ChatGPT hoặc máy chủ Admin. GooHan bản này chưa có AirLift native để sử dụng file đó.")
+        Text("File Pair là dữ liệu ghép đôi nhạy cảm. Không đăng tải lên GitHub, ChatGPT hoặc máy chủ Admin. GooHan chưa có AirLift Patch Driver để ghi bằng file đó.")
             .font(.caption2)
             .foregroundColor(.secondary)
     }
 
     @ViewBuilder
     private var settingsNativeFFISection: some View {
-        Text("iOS 27 • AirLift native pairing/session v4.3")
+        Text("iOS 27 • AirLift Session + Container Test v4.4")
             .font(.headline)
-        Text("FFI đã liên kết; v4.3 thử pairing native và một kiểm tra phiên thiết bị qua luồng syslog (chỉ đọc, không lưu nội dung). Không áp dụng Patch hoặc cấp quyền ghi.")
+        Text("FFI đã liên kết. v4.4 yêu cầu mã native rc=0 và sự kiện syslog, sau đó kiểm tra đường dẫn container của chính GooHan (chỉ đọc). Không ghi Patch.")
             .font(.caption2)
             .foregroundColor(.secondary)
         Button("Kiểm tra thư viện native") {
@@ -484,7 +484,7 @@ struct ContentView: View {
         Button(pairingSession.pairingInProgress ? "Đang chờ ghép đôi native…" : "Bắt đầu ghép đôi trực tiếp (AirLift)") {
             pairingSession.start(vault: pairingVault)
         }
-        .disabled(pairingSession.pairingInProgress || pairingSession.sessionInProgress)
+        .disabled(pairingSession.pairingInProgress || pairingSession.sessionInProgress || pairingSession.ownContainerInProgress)
         .buttonStyle(.borderedProminent)
         Text("Native pairing: " + pairingSession.pairingCode)
             .font(.caption.monospaced())
@@ -506,6 +506,21 @@ struct ContentView: View {
         Text("Session: " + pairingSession.sessionCode)
             .font(.caption.monospaced())
             .textSelection(.enabled)
+        Text("Native rc: " + pairingSession.nativeSessionReturnCode)
+            .font(.caption2.monospaced())
+        Text("Session strict pass: " + (pairingSession.sessionValid(for: pairingVault) ? "YES" : "NO"))
+            .font(.caption2.monospaced())
+        Button(pairingSession.ownContainerInProgress ? "Đang tìm container GooHan…" : "Kiểm tra container GooHan (AirLift, chỉ đọc)") {
+            pairingSession.testOwnContainerReadOnly(vault: pairingVault)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!pairingSession.sessionValid(for: pairingVault) || pairingSession.ownContainerInProgress || pairingSession.sessionInProgress || pairingSession.pairingInProgress)
+        Text("Own container: " + pairingSession.ownContainerCode)
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
+        Text("Chỉ kiểm tra bundle ID của chính GooHan và so khớp với sandbox hiện tại; không đọc nội dung file hoặc container ứng dụng khác. Native có thể trả lỗi nếu dịch vụ không cho phép tra cứu.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
         Text("Kết quả phiên không chứng minh quyền ghi Patch. GooHan chỉ đếm tín hiệu luồng hệ thống, không lưu nội dung; lỗi có thể do pairing, LocalDev hoặc dịch vụ thiết bị.")
             .font(.caption2)
             .foregroundColor(.secondary)
@@ -518,7 +533,7 @@ struct ContentView: View {
                 pairingVault.delete()
             }
         }
-        Text("File Pair là thông tin xác thực nhạy cảm. Không gửi cho người khác. Bản v4.3 không dùng pairing để ghi Patch vào ứng dụng khác.")
+        Text("File Pair là thông tin xác thực nhạy cảm. Không gửi cho người khác. Bản v4.4 không dùng pairing để ghi Patch vào ứng dụng khác.")
             .font(.caption2)
             .foregroundColor(.secondary)
     }
@@ -542,17 +557,32 @@ struct ContentView: View {
     private var settingsFinalGateSection: some View {
         Text("Kết luận điều kiện tiền kiểm")
             .font(.headline)
-        Text("Mã: " + finalGate.resultCode)
+        Text("Mã v4.4: " + v44ReadinessGate)
             .font(.caption.monospaced())
             .foregroundColor(.orange)
-        Text("Đã có native pairing/session test nhưng chưa có AirLift Patch driver và quy trình Restore được kiểm chứng. Không ghi thử trên iOS 27.")
+        Text("Mã v3.3 (tham chiếu TCP): " + finalGate.resultCode)
+            .font(.caption2.monospaced())
+            .foregroundColor(.secondary)
+        Text("Đã bổ sung rc0 + event và phép thử tra cứu chính container. Chưa có AirLift Patch Driver hoặc Restore được xác minh. Không ghi trên iOS 27.")
             .font(.caption2)
             .foregroundColor(.secondary)
-        Button("Sao chép báo cáo native v4.3") {
+        Button("Sao chép báo cáo v4.4") {
             UIPasteboard.general.string = engineDiagnosticsReport()
         }
         .buttonStyle(.borderedProminent)
         .tint(color)
+    }
+
+    /// Native read-only checks take precedence over older manual/TCP
+    /// checkboxes in the v4.4 release-readiness summary. Still NEVER enable Patch.
+    private var v44ReadinessGate: String {
+        guard pairingSession.sessionValid(for: pairingVault) else {
+            return "V44_SESSION_STRICT_UNVERIFIED"
+        }
+        guard pairingSession.ownContainerCode == "NATIVE_OWN_CONTAINER_READ_ONLY_OK" else {
+            return "V44_OWN_CONTAINER_READ_NOT_VERIFIED"
+        }
+        return "V44_READ_ONLY_PREREQUISITES_OK_PATCH_DRIVER_MISSING"
     }
 
     private var finalGate: GHFinalTestGate {
@@ -606,9 +636,10 @@ struct ContentView: View {
             + "\nLocalDev last tested at: " + localDevProbe.completedAt
             + "\nNative AirLift FFI link-only test: " + nativeFFITest.statusCode
             + "\nPairing local vault: " + pairingVault.statusCode
-            + "\n" + pairingSession.safeReport
-            + "\nV4.3 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
-            + "\n" + finalGate.report
+            + "\n" + pairingSession.safeReport(for: pairingVault)
+            + "\nV4.4 readiness gate: " + v44ReadinessGate
+            + "\nV4.4 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
+            + "\nV3.3 legacy TCP comparison only (not v4.4 blocker):\n" + finalGate.report
             + "\n" + localDevReadinessReport
             + "\nTrạng thái quyền truy cập (phiên): " + appState.exploitStatus.displayText
             + "\nSandbox probe: " + permissionNote

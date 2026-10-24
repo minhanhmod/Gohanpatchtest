@@ -8,6 +8,7 @@ import Combine
 final class GHPairingVault: ObservableObject {
     @Published private(set) var statusCode: String = "PAIRING_NOT_IMPORTED"
     @Published private(set) var recordPresent: Bool = false
+    @Published private(set) var credentialRevision = UUID()
     private let maximumSize = 1024 * 1024
 
     init() { reload() }
@@ -40,6 +41,7 @@ final class GHPairingVault: ObservableObject {
                                                     withIntermediateDirectories: true)
             try data.write(to: target, options: [.atomic, .completeFileProtection])
             reload()
+            credentialRevision = UUID()
         } catch {
             statusCode = "PAIRING_IMPORT_FAILED"
             recordPresent = false
@@ -49,6 +51,7 @@ final class GHPairingVault: ObservableObject {
     func delete() {
         try? FileManager.default.removeItem(at: vaultURL)
         reload()
+        credentialRevision = UUID()
     }
 
     /// Native engine may create a record only in our private Application Support tree.
@@ -79,6 +82,7 @@ final class GHPairingVault: ObservableObject {
             try data.write(to: vaultURL, options: [.atomic, .completeFileProtection])
             if standardized != tempURL { try? FileManager.default.removeItem(at: standardized) }
             reload()
+            credentialRevision = UUID()
             return recordPresent
         } catch { return false }
     }

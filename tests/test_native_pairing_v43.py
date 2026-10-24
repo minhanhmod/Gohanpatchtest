@@ -13,7 +13,7 @@ assert 'al_pairing_result_free' in objc and 'al_syslog_stream_stop' in objc
 swift=(r/'ThreeOneOSFive/helpers/GHNativePairingSession.swift').read_text()
 assert 'GHRunNativeReadOnlySessionProbe' in swift
 assert 'presentedPIN' in swift
-assert 'NATIVE_SYSLOG_EVENT_RECEIVED_NO_CONTENT' in swift
+assert 'NATIVE_SYSLOG_EVENT_RECEIVED_NO_CONTENT' in (swift + (r/'ThreeOneOSFive/helpers/GHSessionAssessment.swift').read_text())
 assert 'NATIVE_PAIRING_RETURNED_SUCCESS_RECORD_STORED' in swift
 assert 'GHNativePairingSession' in (r/'ThreeOneOSFive/ContentView.swift').read_text()
 assert 'GHAirLiftProvider.driverFactory != nil' in (r/'ThreeOneOSFive/helpers/GHInstalledPatchEngine.swift').read_text()

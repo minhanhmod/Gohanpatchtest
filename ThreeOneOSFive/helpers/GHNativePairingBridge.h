@@ -17,3 +17,13 @@ FOUNDATION_EXPORT void GHStartNativeOnDevicePairing(NSString *outputPath,
 // Failure can mean no tunnel, invalid pairing, no service, or an iOS restriction.
 FOUNDATION_EXPORT void GHRunNativeReadOnlySessionProbe(NSString *pairingPath,
                                                          GHSessionFinishedBlock finished);
+
+// Native FileService lookup limited to the CURRENT application's own bundle ID.
+// Caller must already have a passing read-only session probe. Only booleans
+// and native return codes leave the bridge, never paths or raw credentials.
+typedef void (^GHOwnContainerFinishedBlock)(BOOL resolvedToOwnSandbox,
+                                              BOOL directoryReadSucceeded,
+                                              int32_t nativeReturnCode);
+FOUNDATION_EXPORT void GHRunNativeOwnContainerReadProbe(NSString *pairingPath,
+                                                         NSString *currentAppBundleID,
+                                                         GHOwnContainerFinishedBlock finished);

@@ -14,6 +14,12 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
     @Published private(set) var pairingInProgress = false
     @Published private(set) var sessionInProgress = false
     @Published private(set) var lastSessionAt = "NOT_TESTED"
+    @Published private(set) var sessionPassed = false
+    @Published private(set) var nativeSessionReturnCode = "NOT_TESTED"
+    @Published private(set) var ownContainerCode = "OWN_CONTAINER_NOT_TESTED"
+    @Published private(set) var ownContainerInProgress = false
+    @Published private(set) var lastOwnContainerAt = "NOT_TESTED"
+    private var verifiedCredentialRevision: UUID?
 
     private var service: NetService?
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
@@ -29,7 +35,8 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
 
     func start(vault: GHPairingVault) {
         guard inScope else { pairingCode = "BUILD_OUTSIDE_TEST_SCOPE"; return }
-        guard !pairingInProgress else { return }
+        guard !pairingInProgress && !sessionInProgress && !ownContainerInProgress else { return }
+        invalidateSessionState()
         guard let temporary = vault.prepareNativePairingOutput() else {
             pairingCode = "PAIRING_VAULT_PREPARATION_FAILED"; return
         }
@@ -78,19 +85,89 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
 
     func verifySelfReadOnly(vault: GHPairingVault) {
         guard inScope else { sessionCode = "BUILD_OUTSIDE_TEST_SCOPE"; return }
-        guard !sessionInProgress && !pairingInProgress else { return }
+        guard !sessionInProgress && !pairingInProgress && !ownContainerInProgress else { return }
         guard let path = vault.storedCredentialPath else {
             sessionCode = "NO_STORED_PAIRING_CREDENTIAL"; return
         }
         sessionInProgress = true
+        invalidateSessionState()
         sessionCode = "READ_ONLY_SYSLOG_SESSION_RUNNING"
+        let testedCredentialRevision = vault.credentialRevision
         GHRunNativeReadOnlySessionProbe(path) { [weak self] succeeded, rc in
             guard let self else { return }
             self.sessionInProgress = false
             self.lastSessionAt = ISO8601DateFormatter().string(from: Date())
-            // No syslog content was recorded. A received event does not grant write access.
-            self.sessionCode = succeeded ? "NATIVE_SYSLOG_EVENT_RECEIVED_NO_CONTENT" : "NATIVE_SESSION_UNVERIFIED_\(rc)"
+            // Require both native rc == 0 and a real event. An event alone
+            // was incorrectly considered sufficient in v4.3.
+            self.nativeSessionReturnCode = String(rc)
+            self.sessionCode = GHSessionAssessment.status(receivedEvent: succeeded, returnCode: rc)
+            self.sessionPassed = GHSessionAssessment.passed(receivedEvent: succeeded, returnCode: rc)
+                && testedCredentialRevision == vault.credentialRevision
+            self.verifiedCredentialRevision = self.sessionPassed ? testedCredentialRevision : nil
+            if !self.sessionPassed && testedCredentialRevision != vault.credentialRevision {
+                self.sessionCode = "PAIRING_CHANGED_DURING_SESSION"
+            }
         }
+    }
+
+    /// Published state is only valid for the exact credential revision that
+    /// passed the native read-only session check.
+    func sessionValid(for vault: GHPairingVault) -> Bool {
+        sessionPassed && verifiedCredentialRevision == vault.credentialRevision
+    }
+
+    /// Native lookup is constrained by the Objective-C bridge to this app's
+    /// exact bundle identifier, and then compared to NSHomeDirectory().
+    /// No third-party container or patch path is accepted.
+    func testOwnContainerReadOnly(vault: GHPairingVault) {
+        guard inScope else { ownContainerCode = "BUILD_OUTSIDE_TEST_SCOPE"; return }
+        guard !ownContainerInProgress && !sessionInProgress && !pairingInProgress else { return }
+        guard sessionValid(for: vault) else {
+            ownContainerCode = "VERIFIED_SESSION_REQUIRED"
+            sessionPassed = false
+            return
+        }
+        guard let path = vault.storedCredentialPath,
+              let bundleID = Bundle.main.bundleIdentifier, !bundleID.isEmpty else {
+            ownContainerCode = "SELF_ID_OR_PAIRING_MISSING"; return
+        }
+        ownContainerInProgress = true
+        ownContainerCode = "NATIVE_OWN_CONTAINER_LOOKUP_RUNNING"
+        // Lookup is blocking inside the vendor FFI. There is no safe native
+        // cancellation API; never start a second lookup while one is pending.
+        // If it takes longer than 20 seconds, report that it is still running.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            if self?.ownContainerInProgress == true {
+                self?.ownContainerCode = "NATIVE_OWN_CONTAINER_LOOKUP_SLOW_STILL_RUNNING"
+            }
+        }
+        GHRunNativeOwnContainerReadProbe(path, bundleID) { [weak self] matched, readable, rc in
+            guard let self else { return }
+            self.ownContainerInProgress = false
+            self.lastOwnContainerAt = ISO8601DateFormatter().string(from: Date())
+            guard self.verifiedCredentialRevision == vault.credentialRevision else {
+                self.invalidateSessionState()
+                self.ownContainerCode = "PAIRING_CHANGED_DURING_CONTAINER_CHECK"
+                return
+            }
+            if rc != 0 {
+                self.ownContainerCode = "NATIVE_CONTAINER_LOOKUP_RC_\(rc)"
+            } else if !matched {
+                self.ownContainerCode = "NATIVE_CONTAINER_PATH_NOT_OWN_SANDBOX"
+            } else if !readable {
+                self.ownContainerCode = "NATIVE_OWN_CONTAINER_READ_DENIED"
+            } else {
+                self.ownContainerCode = "NATIVE_OWN_CONTAINER_READ_ONLY_OK"
+            }
+        }
+    }
+
+    private func invalidateSessionState() {
+        sessionPassed = false
+        verifiedCredentialRevision = nil
+        nativeSessionReturnCode = "NOT_TESTED"
+        ownContainerCode = "OWN_CONTAINER_NOT_TESTED"
     }
 
     private func publishPairingService(id: String, port: UInt16, txt: [String: Data]) {
@@ -143,11 +220,16 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
         backgroundTask = .invalid
     }
 
-    var safeReport: String {
+    func safeReport(for vault: GHPairingVault) -> String {
         ["Native pairing: \(pairingCode)",
          "Pairing Bonjour: \(bonjourCode)",
          "Native read-only session: \(sessionCode)",
+         "Session native rc: \(nativeSessionReturnCode)",
+         "Session strict pass (rc0 + event + unchanged credential): \(sessionValid(for: vault) ? "yes" : "no")",
          "Session last checked: \(lastSessionAt)",
-         "Session probe NEVER writes target files; result cannot authorize Patch."].joined(separator: "\n")
+         "Native self-container lookup: \(ownContainerCode)",
+         "Own container last checked: \(lastOwnContainerAt)",
+         "V4.4 PATCH GATE: AIRLIFT_PATCH_DRIVER_MISSING",
+         "Read-only probes never authorize Patch or third-party container access."].joined(separator: "\n")
     }
 }

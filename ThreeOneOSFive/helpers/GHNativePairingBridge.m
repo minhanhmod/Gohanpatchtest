@@ -123,3 +123,51 @@ void GHRunNativeReadOnlySessionProbe(NSString *pairingPath,
         });
     });
 }
+
+// Read-only AirLift lookup of THIS APP'S sandbox. Refuses to query any
+// third-party bundle ID: compare the requested identifier to the running bundle.
+// The returned path is never logged, copied to callbacks, or persisted.
+void GHRunNativeOwnContainerReadProbe(NSString *pairingPath,
+                                      NSString *currentAppBundleID,
+                                      GHOwnContainerFinishedBlock finished) {
+    if (!finished) { return; }
+    NSString *selfBundle = NSBundle.mainBundle.bundleIdentifier ?: @"";
+    if (pairingPath.length == 0 || currentAppBundleID.length == 0 ||
+        ![currentAppBundleID isEqualToString:selfBundle]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ finished(NO, NO, -10); });
+        return;
+    }
+    NSString *localPair = [pairingPath copy];
+    NSString *bundleID = [currentAppBundleID copy];
+    GHOwnContainerFinishedBlock completion = [finished copy];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        char *resultPath = NULL;
+        char *errorText = NULL;
+        // This API discovers the app data container, it does not invoke any
+        // AirTraffic exploit/write or access the contents of another app.
+        int32_t rc = al_find_app_container(localPair.UTF8String, bundleID.UTF8String,
+                                           NULL, NULL, &resultPath, &errorText);
+        BOOL matchesCurrentSandbox = NO;
+        BOOL canReadCurrentSandbox = NO;
+        if (rc == 0 && resultPath != NULL) {
+            NSString *resolved = [NSString stringWithUTF8String:resultPath];
+            // Compare after normalization to accommodate /private/var vs /var.
+            NSString *home = [NSHomeDirectory() stringByResolvingSymlinksInPath];
+            NSString *native = [resolved stringByResolvingSymlinksInPath];
+            matchesCurrentSandbox = (native.length > 0 && home.length > 0 &&
+                                     [native isEqualToString:home]);
+            if (matchesCurrentSandbox) {
+                NSError *readError = nil;
+                // Metadata-only directory listing, no file contents are read.
+                NSArray<NSString *> *entries = [[NSFileManager defaultManager]
+                    contentsOfDirectoryAtPath:home error:&readError];
+                canReadCurrentSandbox = (entries != nil && readError == nil);
+            }
+        }
+        if (resultPath) { al_string_free(resultPath); }
+        if (errorText) { al_string_free(errorText); }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(matchesCurrentSandbox, canReadCurrentSandbox, rc);
+        });
+    });
+}
