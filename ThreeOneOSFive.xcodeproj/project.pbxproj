@@ -86,6 +86,9 @@
 		DCA1000000000000000000B2 /* GHNativePairingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000B2; };
         F45000000000000000000001 /* GHOwnSandboxTransactionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F45000000000000000000003; };
         F45000000000000000000002 /* GHOwnSandboxTransactionReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = F45000000000000000000004; };
+        F46000000000000000000001 /* GHV46NativeWriteReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46000000000000000000003; };
+        F46000000000000000000002 /* GHV46NativeWriteAssessment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46000000000000000000004; };
+        F46000000000000000000005 /* GHNativeOwnFixtureBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F46000000000000000000007; };
         DCA1000000000000000000C0 /* GHSessionAssessment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB1000000000000000000C0; };
 /* End PBXBuildFile section */
 
@@ -190,6 +193,10 @@
 		DCB1000000000000000000B2 /* GHNativePairingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHNativePairingSession.swift; sourceTree = "<group>"; };
         F45000000000000000000003 /* GHOwnSandboxTransactionCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHOwnSandboxTransactionCore.swift; sourceTree = "<group>"; };
         F45000000000000000000004 /* GHOwnSandboxTransactionReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHOwnSandboxTransactionReadiness.swift; sourceTree = "<group>"; };
+        F46000000000000000000003 /* GHV46NativeWriteReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHV46NativeWriteReadiness.swift; sourceTree = "<group>"; };
+        F46000000000000000000004 /* GHV46NativeWriteAssessment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHV46NativeWriteAssessment.swift; sourceTree = "<group>"; };
+        F46000000000000000000006 /* GHNativeOwnFixtureBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GHNativeOwnFixtureBridge.h; sourceTree = "<group>"; };
+        F46000000000000000000007 /* GHNativeOwnFixtureBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GHNativeOwnFixtureBridge.m; sourceTree = "<group>"; };
         DCB1000000000000000000C0 /* GHSessionAssessment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GHSessionAssessment.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -303,6 +310,10 @@
                 DCB1000000000000000000B2 /* GHNativePairingSession.swift */,
                 F45000000000000000000003 /* GHOwnSandboxTransactionCore.swift */,
                 F45000000000000000000004 /* GHOwnSandboxTransactionReadiness.swift */,
+                F46000000000000000000003 /* GHV46NativeWriteReadiness.swift */,
+                F46000000000000000000004 /* GHV46NativeWriteAssessment.swift */,
+                F46000000000000000000006 /* GHNativeOwnFixtureBridge.h */,
+                F46000000000000000000007 /* GHNativeOwnFixtureBridge.m */,
                 DCB1000000000000000000C0 /* GHSessionAssessment.swift */,
                 DCB1000000000000000000A1 /* GHNativeFFIProbe.m */,
 				3105B119 /* PatchProjectLibrary.swift */,
@@ -459,6 +470,9 @@
                 DCA1000000000000000000B2,
                 F45000000000000000000001,
                 F45000000000000000000002,
+                F46000000000000000000001,
+                F46000000000000000000002,
+                F46000000000000000000005,
                 DCA1000000000000000000C0,
 				3105B219,
 				3105B220,

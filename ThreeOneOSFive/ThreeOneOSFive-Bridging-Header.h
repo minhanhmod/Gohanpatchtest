@@ -8,3 +8,5 @@
 
 #import "helpers/GHNativeFFIProbe.h"
 #import "helpers/GHNativePairingBridge.h"
+
+#import "helpers/GHNativeOwnFixtureBridge.h"

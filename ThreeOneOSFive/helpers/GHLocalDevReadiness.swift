@@ -36,11 +36,11 @@ struct GHLocalDevReadiness {
             : "chưa được người dùng xác nhận"
         let native = nativeAirLiftRegistered
             ? "đã đăng ký provider, chưa chứng minh hoạt động"
-            : "chưa tích hợp mã native"
+            : "AirliftFFI đã được liên kết; chưa đăng ký AirLift Patch Driver"
         return "Chẩn đoán iOS 27 | build \(build) | \(buildNote)\n"
             + "LocalDevVPN: \(local)\n"
             + "AirLift: \(native)\n"
-            + "Trạng thái: \(code)\n"
+            + "Trạng thái: \(code) (mã cũ nói về Patch Driver, không phải thư viện FFI)\n"
             + "Lưu ý: Kết nối VPN, File Pair hoặc số phiên bản iOS không tự cấp quyền truy cập container."
     }
 }

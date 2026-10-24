@@ -164,6 +164,8 @@ struct ContentView: View {
     @StateObject private var pairingVault = GHPairingVault()
     @StateObject private var pairingSession = GHNativePairingSession()
     @StateObject private var ownSandboxTransaction = GHOwnSandboxTransactionReadiness()
+    @StateObject private var nativeOwnWrite = GHV46NativeWriteReadiness()
+    @State private var nativeOwnWriteAcknowledged = false
     @State private var pairingFileImporter = false
     @StateObject private var localDevProbe = GHLocalDevProbe()
     @State private var game = "free_fire"
@@ -381,6 +383,7 @@ struct ContentView: View {
                     settingsLocalDevSection
                     settingsNativeFFISection
                     settingsTransactionSection
+                    settingsNativeOwnWriteSection
                     settingsBeta5ComparisonSection
                     settingsFinalGateSection
                     settingsDiagnosticsSection
@@ -576,6 +579,32 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private var settingsNativeOwnWriteSection: some View {
+        Text("iOS 27 • AirLift Native Write Test v4.6")
+            .font(.headline)
+        Text("Chỉ trên iPhone thử nghiệm. Thư viện AirLift là mã native bên thứ ba, có thể lỗi hoặc dừng. Phép thử chỉ tạo tệp dùng một lần trong sandbox của GooHan; không áp dụng Patch hoặc sửa ứng dụng khác.")
+            .font(.caption2)
+            .foregroundColor(.orange)
+        Toggle("Tôi đồng ý chạy phép thử native trên dữ liệu thử nghiệm của GooHan", isOn: $nativeOwnWriteAcknowledged)
+            .font(.footnote)
+        Button(nativeOwnWrite.isRunning ? "Đang gọi AirLift native…" : "Chạy Native Write → SHA-256 → Restore (GooHan only)") {
+            nativeOwnWrite.run(vault: pairingVault, nativeSession: pairingSession,
+                               v45: ownSandboxTransaction)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!nativeOwnWriteAcknowledged || !v45SandboxPreconditionsReady
+                  || !ownSandboxTransaction.allSandboxChecksPassed || nativeOwnWrite.isRunning)
+        Text(nativeOwnWrite.safeReport)
+            .font(.caption2.monospaced())
+            .foregroundColor(.secondary)
+            .textSelection(.enabled)
+        Button("Sao chép báo cáo v4.6") {
+            UIPasteboard.general.string = engineDiagnosticsReport()
+        }
+        .buttonStyle(.bordered)
+    }
+
+    @ViewBuilder
     private var settingsBeta5ComparisonSection: some View {
         Text("Đối chiếu với 3105 Beta 5 (cùng iPhone)")
             .font(.headline)
@@ -680,8 +709,9 @@ struct ContentView: View {
             + "\nPairing local vault: " + pairingVault.statusCode
             + "\n" + pairingSession.safeReport(for: pairingVault)
             + "\n" + ownSandboxTransaction.safeReport
+            + "\n" + nativeOwnWrite.safeReport
             + "\nV4.4 readiness gate: " + v44ReadinessGate
-            + "\nV4.5 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
+            + "\nV4.6 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
             + "\nV3.3 legacy TCP comparison only (not v4.4 blocker):\n" + finalGate.report
             + "\n" + localDevReadinessReport
             + "\nTrạng thái quyền truy cập (phiên): " + appState.exploitStatus.displayText
