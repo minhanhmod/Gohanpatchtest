@@ -12,6 +12,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
     @Published private(set) var nativeReturnCode = "NOT_RUN"
     @Published private(set) var nativeErrorCategory = "NOT_RUN"
     @Published private(set) var baselineVerified = false
+    @Published private(set) var stagingSHA256Verified = false
     @Published private(set) var backupVerified = false
     @Published private(set) var nativeWriteVerified = false
     @Published private(set) var restoreVerified = false
@@ -36,6 +37,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
             return
         }
         baselineVerified = false
+        stagingSHA256Verified = false
         backupVerified = false
         nativeWriteVerified = false
         restoreVerified = false
@@ -74,6 +76,13 @@ final class GHV46NativeWriteReadiness: ObservableObject {
             }
             try original.write(to: targetFile, options: [.atomic, .completeFileProtection])
             try replacement.write(to: stageFile, options: [.atomic, .completeFileProtection])
+            // Validate the *local* source file independently from the opaque
+            // AirLift library. It may still reject an on-device destination.
+            stagingSHA256Verified = Self.sha(try Data(contentsOf: stageFile)) == replacementDigest
+            guard stagingSHA256Verified else {
+                resultCode = "V46_LOCAL_STAGING_SHA256_FAILED"
+                return
+            }
             baselineVerified = Self.sha(try Data(contentsOf: targetFile)) == originalDigest
             guard baselineVerified else {
                 resultCode = "V46_BASELINE_NOT_VERIFIED"
@@ -142,6 +151,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
          "Writer: AIRLIFT_NATIVE_al_exploit_write_dir_SELF_ONLY",
          "Native rc: \(nativeReturnCode)",
          "Native error class (redacted): \(nativeErrorCategory)",
+         "Local staging SHA256 verified: \(stagingSHA256Verified ? "yes" : "no")",
          "Baseline verified: \(baselineVerified ? "yes" : "no")",
          "Backup verified: \(backupVerified ? "yes" : "no")",
          "Native replacement SHA verified: \(nativeWriteVerified ? "yes" : "no")",

@@ -74,11 +74,25 @@ static NSString *gh_native_error_class(const char *nativeError, int32_t rc) {
     for (NSString *token in @[@"connection", @"connect", @"tunnel", @"network", @"timeout", @"timed out", @"dial", @"transport", @"rsd"]) {
         if ([lower containsString:token]) { return @"AL_ERROR_TUNNEL_OR_NETWORK"; }
     }
-    for (NSString *token in @[@"not found", @"no such file", @"source", @"directory", @"path", @"file"]) {
-        if ([lower containsString:token]) { return @"AL_ERROR_SOURCE_OR_PATH"; }
-    }
-    for (NSString *token in @[@"lockdown", @"afc", @"service unavailable", @"service not available"]) {
+    // FileService/Lockdown is a device-service failure, not automatically a
+    // missing *local* source file. Check these before interpreting path errors.
+    for (NSString *token in @[@"lockdown", @"afc", @"fileservice", @"file service", @"coredevice", @"service unavailable", @"service not available"]) {
         if ([lower containsString:token]) { return @"AL_ERROR_DEVICE_SERVICE"; }
+    }
+    // Only categorize paths when the native diagnostic is specific. In v4.6.1
+    // the generic word 'file' matched nearly everything, giving a false sense
+    // of certainty that the local staging path was wrong.
+    for (NSString *token in @[@"source_dir", @"source directory", @"source folder", @"source path", @"source file", @"staging directory"]) {
+        if ([lower containsString:token]) { return @"AL_ERROR_NATIVE_SOURCE_REFERENCE"; }
+    }
+    for (NSString *token in @[@"target_dir", @"target directory", @"target folder", @"target path", @"destination path"]) {
+        if ([lower containsString:token]) { return @"AL_ERROR_NATIVE_TARGET_REFERENCE"; }
+    }
+    for (NSString *token in @[@"no such file", @"not found", @"not a directory", @"file does not exist"]) {
+        if ([lower containsString:token]) { return @"AL_ERROR_NATIVE_PATH_UNRESOLVED"; }
+    }
+    for (NSString *token in @[@"invalid argument", @"invalid parameter", @"bad argument"]) {
+        if ([lower containsString:token]) { return @"AL_ERROR_INVALID_NATIVE_ARGUMENT"; }
     }
     for (NSString *token in @[@"airtraffic", @"exploit", @"canary", @"write failed"]) {
         if ([lower containsString:token]) { return @"AL_ERROR_NATIVE_WRITE_STAGE"; }
