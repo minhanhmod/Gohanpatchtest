@@ -51,6 +51,44 @@ final class GHPairingVault: ObservableObject {
         reload()
     }
 
+    /// Native engine may create a record only in our private Application Support tree.
+    /// A successful file write is not a verified device session.
+    func prepareNativePairingOutput() -> URL? {
+        let folder = vaultURL.deletingLastPathComponent()
+        guard (try? FileManager.default.createDirectory(at: folder,
+                        withIntermediateDirectories: true)) != nil else { return nil }
+        return folder.appendingPathComponent("temporary-\(UUID().uuidString).plist")
+    }
+
+    func discardTemporaryNativeRecord(_ url: URL) {
+        guard url.deletingLastPathComponent().standardizedFileURL == vaultURL.deletingLastPathComponent().standardizedFileURL else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Only invoked on an actual rc==0 native pairing result. Do not trust a
+    /// path returned by a library if it escapes the private storage directory.
+    func finalizeNativePairing(tempURL: URL, nativeResultPath: String) -> Bool {
+        let parent = vaultURL.deletingLastPathComponent().standardizedFileURL
+        let result = nativeResultPath.isEmpty ? tempURL : URL(fileURLWithPath: nativeResultPath)
+        let standardized = result.standardizedFileURL
+        guard standardized.deletingLastPathComponent() == parent else { return false }
+        defer { discardTemporaryNativeRecord(tempURL) }
+        guard let data = try? Data(contentsOf: standardized),
+              data.count > 0, data.count <= maximumSize else { return false }
+        do {
+            try data.write(to: vaultURL, options: [.atomic, .completeFileProtection])
+            if standardized != tempURL { try? FileManager.default.removeItem(at: standardized) }
+            reload()
+            return recordPresent
+        } catch { return false }
+    }
+
+    /// Only for this app's explicit, read-only native test. Do not expose in logs.
+    var storedCredentialPath: String? {
+        reload()
+        return recordPresent ? vaultURL.path : nil
+    }
+
     /// Deliberately not exposed: the imported credential is not yet authenticated.
     /// Any future adapter must prove a verified pairing handshake before use.
 }

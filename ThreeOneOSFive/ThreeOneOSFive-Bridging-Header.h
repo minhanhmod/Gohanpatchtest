@@ -7,3 +7,4 @@
 #import "helpers/DisplayIdentity.h"
 
 #import "helpers/GHNativeFFIProbe.h"
+#import "helpers/GHNativePairingBridge.h"

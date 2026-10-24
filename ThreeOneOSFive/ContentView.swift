@@ -162,6 +162,7 @@ struct ContentView: View {
     @AppStorage("GHFinalTestBeta5Patch") private var beta5PatchObserved = false
     @StateObject private var nativeFFITest = GHNativeFFIReadiness()
     @StateObject private var pairingVault = GHPairingVault()
+    @StateObject private var pairingSession = GHNativePairingSession()
     @State private var pairingFileImporter = false
     @StateObject private var localDevProbe = GHLocalDevProbe()
     @State private var game = "free_fire"
@@ -414,7 +415,7 @@ struct ContentView: View {
                 .disabled(!GHInstalledPatchEngine.airLiftReady)
         }
         .pickerStyle(.menu)
-        Text("AirLift của 3105 Beta 5 chưa có mã nguồn native tương thích; lựa chọn Tự động hiện dùng GooHan cũ. Không có chức năng ghi dự phòng qua AirLift trong bản này.")
+        Text("Đã tích hợp thư viện native và thử pairing/session; chưa có AirLift Patch Driver với sao lưu, xác minh và khôi phục. GooHan không ghi Patch trên iOS 27 trong bản thử.")
             .font(.footnote)
             .foregroundColor(.secondary)
         Text(GHInstalledPatchEngine.deviceSummary())
@@ -465,9 +466,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var settingsNativeFFISection: some View {
-        Text("iOS 27 • AirLift native link test")
+        Text("iOS 27 • AirLift native pairing/session v4.3")
             .font(.headline)
-        Text("Đây là thử nghiệm gọi thư viện AirliftFFI arm64 từ source ProxyApp. KHÔNG phải thao tác Patch, xác thực pairing hay cấp quyền container.")
+        Text("FFI đã liên kết; v4.3 thử pairing native và một kiểm tra phiên thiết bị qua luồng syslog (chỉ đọc, không lưu nội dung). Không áp dụng Patch hoặc cấp quyền ghi.")
             .font(.caption2)
             .foregroundColor(.secondary)
         Button("Kiểm tra thư viện native") {
@@ -480,6 +481,34 @@ struct ContentView: View {
         Text("Pairing: " + pairingVault.statusCode)
             .font(.caption.monospaced())
             .textSelection(.enabled)
+        Button(pairingSession.pairingInProgress ? "Đang chờ ghép đôi native…" : "Bắt đầu ghép đôi trực tiếp (AirLift)") {
+            pairingSession.start(vault: pairingVault)
+        }
+        .disabled(pairingSession.pairingInProgress || pairingSession.sessionInProgress)
+        .buttonStyle(.borderedProminent)
+        Text("Native pairing: " + pairingSession.pairingCode)
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
+        Text("Bonjour: " + pairingSession.bonjourCode)
+            .font(.caption.monospaced())
+        if !pairingSession.presentedPIN.isEmpty {
+            Text("PIN (chỉ hiện trên iPhone): " + pairingSession.presentedPIN)
+                .font(.headline.monospaced())
+        }
+        Text("Khi bắt đầu, mở Cài đặt iOS → Quyền riêng tư & Bảo mật → Chế độ nhà phát triển để hoàn tất pairing. iOS có thể tạm dừng ứng dụng nền; nếu kẹt, đóng/mở lại GooHan.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+        Button(pairingSession.sessionInProgress ? "Đang truy vấn chỉ đọc…" : "Kiểm tra phiên AirLift (không ghi dữ liệu)") {
+            pairingSession.verifySelfReadOnly(vault: pairingVault)
+        }
+        .buttonStyle(.bordered)
+        .disabled(pairingSession.sessionInProgress || pairingSession.pairingInProgress || !pairingVault.recordPresent)
+        Text("Session: " + pairingSession.sessionCode)
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
+        Text("Kết quả phiên không chứng minh quyền ghi Patch. GooHan chỉ đếm tín hiệu luồng hệ thống, không lưu nội dung; lỗi có thể do pairing, LocalDev hoặc dịch vụ thiết bị.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
         Button("Nhập pairing từ Files (lưu riêng trên iPhone)") {
             pairingFileImporter = true
         }
@@ -489,7 +518,7 @@ struct ContentView: View {
                 pairingVault.delete()
             }
         }
-        Text("File Pair là thông tin xác thực nhạy cảm. Đã lưu ≠ đã xác thực. Không chia sẻ file, không đưa vào Admin. GooHan không dùng file đó để vượt quyền ứng dụng.")
+        Text("File Pair là thông tin xác thực nhạy cảm. Không gửi cho người khác. Bản v4.3 không dùng pairing để ghi Patch vào ứng dụng khác.")
             .font(.caption2)
             .foregroundColor(.secondary)
     }
@@ -516,10 +545,10 @@ struct ContentView: View {
         Text("Mã: " + finalGate.resultCode)
             .font(.caption.monospaced())
             .foregroundColor(.orange)
-        Text("Bản này không chứa engine AirLift native; báo cáo đầy đủ giúp phân biệt lỗi kết nối và phần engine còn thiếu. Không ghi thử trên iOS 27.")
+        Text("Đã có native pairing/session test nhưng chưa có AirLift Patch driver và quy trình Restore được kiểm chứng. Không ghi thử trên iOS 27.")
             .font(.caption2)
             .foregroundColor(.secondary)
-        Button("Sao chép báo cáo Final Test v3.3") {
+        Button("Sao chép báo cáo native v4.3") {
             UIPasteboard.general.string = engineDiagnosticsReport()
         }
         .buttonStyle(.borderedProminent)
@@ -577,6 +606,8 @@ struct ContentView: View {
             + "\nLocalDev last tested at: " + localDevProbe.completedAt
             + "\nNative AirLift FFI link-only test: " + nativeFFITest.statusCode
             + "\nPairing local vault: " + pairingVault.statusCode
+            + "\n" + pairingSession.safeReport
+            + "\nV4.3 patch release gate: AIRLIFT_PATCH_DRIVER_MISSING"
             + "\n" + finalGate.report
             + "\n" + localDevReadinessReport
             + "\nTrạng thái quyền truy cập (phiên): " + appState.exploitStatus.displayText
