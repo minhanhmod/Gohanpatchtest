@@ -39,6 +39,15 @@ jobs:
           python3 tests/test_native_link_v4.py
           python3 tests/test_native_pairing_v43.py
           python3 tests/test_pairing_optional_callbacks_v431.py
+          python3 tests/test_native_session_v44.py
+          python3 tests/test_own_sandbox_v45.py
+          python3 tests/test_native_own_fixture_v46.py
+          swiftc -swift-version 5 ThreeOneOSFive/helpers/GHV46NativeWriteAssessment.swift tests/GHV46NativeWriteAssessmentTests.swift -o /tmp/gh_native_v46_assessment
+          /tmp/gh_native_v46_assessment
+          swiftc -swift-version 5 ThreeOneOSFive/helpers/GHOwnSandboxTransactionCore.swift tests/GHOwnSandboxTransactionCoreTests.swift -o /tmp/gh_own_sandbox_v45
+          /tmp/gh_own_sandbox_v45
+          swiftc -swift-version 5 ThreeOneOSFive/helpers/GHSessionAssessment.swift tests/GHSessionAssessmentTests.swift -o /tmp/gh_session_assessment_v44
+          /tmp/gh_session_assessment_v44
           python3 tests/test_xcframework_module_wiring_v4_2.py
           python3 tests/test_web_upload_archive_v4_1.py
           shasum -a 256 Frameworks/AirliftFFI.xcframework/ios-arm64/libairlift_ffi.a
