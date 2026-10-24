@@ -41,8 +41,18 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
         startShortBackgroundTask()
 
         GHStartNativeOnDevicePairing(temporary.path, { [weak self] id, port, txt in
+            // Objective-C bridge callbacks may supply nil values to Swift.
+            // Reject invalid native callbacks rather than force-unwrapping.
+            guard let id = id, !id.isEmpty, let txt = txt else {
+                self?.bonjourCode = "BONJOUR_INVALID_NATIVE_CALLBACK"
+                return
+            }
             self?.publishPairingService(id: id, port: port, txt: txt)
         }, { [weak self] pin in
+            guard let pin = pin, !pin.isEmpty else {
+                self?.pairingCode = "NATIVE_PIN_CALLBACK_INVALID"
+                return
+            }
             self?.presentedPIN = pin // PIN displayed locally, excluded from diagnostics.
             self?.pairingCode = "NATIVE_PIN_PROMPT_SHOWN"
         }, { [weak self] success, nativePath, rc in
@@ -51,8 +61,11 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
             self.finishShortBackgroundTask()
             self.pairingInProgress = false
             self.presentedPIN = ""
+            // A nil/empty native path means the library used our supplied
+            // temporary output path. The vault independently verifies its
+            // location, size and successful persistence before reporting success.
             if success && vault.finalizeNativePairing(tempURL: temporary,
-                                                       nativeResultPath: nativePath) {
+                                                       nativeResultPath: nativePath ?? "") {
                 self.pairingCode = "NATIVE_PAIRING_RETURNED_SUCCESS_RECORD_STORED"
             } else {
                 vault.discardTemporaryNativeRecord(temporary)
@@ -94,12 +107,18 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
         bonjourCode = "BONJOUR_PUBLISHING"
     }
 
-    func netServiceDidPublish(_ sender: NetService) {
-        bonjourCode = "BONJOUR_PUBLISHED"
+    // NetServiceDelegate requirements are nonisolated in modern SDKs.
+    // Publish callbacks are marshalled to the actor that owns UI state.
+    nonisolated func netServiceDidPublish(_ sender: NetService) {
+        Task { @MainActor [weak self] in
+            self?.bonjourCode = "BONJOUR_PUBLISHED"
+        }
     }
 
-    func netService(_ sender: NetService, didNotPublish errorDict: [String : NSNumber]) {
-        bonjourCode = "BONJOUR_PUBLISH_FAILED"
+    nonisolated func netService(_ sender: NetService, didNotPublish errorDict: [String : NSNumber]) {
+        Task { @MainActor [weak self] in
+            self?.bonjourCode = "BONJOUR_PUBLISH_FAILED"
+        }
     }
 
     private func stopPairingAdvertising() {
