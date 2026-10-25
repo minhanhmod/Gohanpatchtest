@@ -547,7 +547,7 @@ struct ContentView: View {
     private var settingsTransactionSection: some View {
         Text("iOS 27 • Giao dịch thử nghiệm v4.5")
             .font(.headline)
-        Text("Sau khi kiểm chứng phiên và container GooHan, chạy thử Backup → Write → Verify SHA-256 → Restore CHỈ trong Application Support của GooHan. Đây là ghi bằng Foundation, KHÔNG phải engine ghi AirLift.")
+        Text("Bài test v4.5 chỉ ghi trong Application Support của chính GooHan bằng Foundation; có thể chạy độc lập ngay cả khi AirLift Session rc=1. Không ghi Patch và không sửa container ứng dụng khác.")
             .font(.caption2)
             .foregroundColor(.secondary)
         Button(ownSandboxTransaction.isRunning ? "Đang thử giao dịch…" : "1. Backup → Write → Verify → Restore") {
@@ -573,7 +573,7 @@ struct ContentView: View {
             .font(.caption2.monospaced())
             .foregroundColor(.secondary)
             .textSelection(.enabled)
-        Text("Nếu nút bị khóa, chạy lại Session → Own Container ở phía trên. Thành công v4.5 KHÔNG chứng minh có quyền ghi container ứng dụng khác; AIRLIFT_PATCH_DRIVER_MISSING vẫn giữ nguyên.")
+        Text("v4.5 không cần Pairing/Session/LocalDev. Nếu v4.5 bị khóa, kiểm tra bài test khác đang chạy hoặc phiên bản iOS ngoài phạm vi test. Thành công v4.5 KHÔNG chứng minh quyền ghi AirLift; AIRLIFT_PATCH_DRIVER_MISSING vẫn giữ nguyên.")
             .font(.caption2)
             .foregroundColor(.secondary)
     }
@@ -592,8 +592,13 @@ struct ContentView: View {
                                v45: ownSandboxTransaction)
         }
         .buttonStyle(.borderedProminent)
-        .disabled(!nativeOwnWriteAcknowledged || !v45SandboxPreconditionsReady
-                  || !ownSandboxTransaction.allSandboxChecksPassed || nativeOwnWrite.isRunning)
+        .disabled(!nativeOwnWriteAcknowledged || !v46NativePreconditionsReady
+                  || !ownSandboxTransaction.allSandboxChecksPassed || nativeOwnWrite.isRunning
+                  || ownSandboxTransaction.isRunning)
+        Text("Điều kiện Native Write: " + v46NativeBlockerText)
+            .font(.caption2)
+            .foregroundColor(.orange)
+            .textSelection(.enabled)
         Text(nativeOwnWrite.safeReport)
             .font(.caption2.monospaced())
             .foregroundColor(.secondary)
@@ -639,9 +644,42 @@ struct ContentView: View {
         .tint(color)
     }
 
+    /// v4.5 uses Foundation exclusively in THIS APP's Application Support.
+    /// It must NOT depend on AirLift pairing, syslog, or native container lookup.
+    /// Keep native and Foundation fixture tests separate while one is running.
     private var v45SandboxPreconditionsReady: Bool {
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        let inIOS27TestScope = os.majorVersion == 27 && (os.minorVersion == 0 || os.minorVersion == 1
+            || (os.minorVersion == 2 && ["24B5084k", "24B5089g"].contains(AppInfo.osBuild)))
+        return inIOS27TestScope && !nativeOwnWrite.isRunning
+    }
+
+    /// Only a verified AirLift session and a verified self-container lookup may
+    /// unlock the native experiment; self-sandbox Foundation results do not.
+    private var v46NativePreconditionsReady: Bool {
         pairingSession.sessionValid(for: pairingVault)
             && pairingSession.ownContainerCode == "NATIVE_OWN_CONTAINER_READ_ONLY_OK"
+            && !pairingSession.sessionInProgress
+            && !pairingSession.ownContainerInProgress
+            && !pairingSession.pairingInProgress
+    }
+
+    private var v46NativeBlockerText: String {
+        if !pairingSession.sessionValid(for: pairingVault) {
+            return "SESSION_UNVERIFIED_RC_" + pairingSession.nativeSessionReturnCode
+        }
+        if pairingSession.ownContainerCode != "NATIVE_OWN_CONTAINER_READ_ONLY_OK" {
+            return "OWN_CONTAINER_NOT_VERIFIED"
+        }
+        if !ownSandboxTransaction.allSandboxChecksPassed {
+            return "V45_THREE_SANDBOX_TESTS_REQUIRED"
+        }
+        if !nativeOwnWriteAcknowledged { return "EXPLICIT_ACKNOWLEDGMENT_REQUIRED" }
+        if pairingSession.pairingInProgress || pairingSession.sessionInProgress || pairingSession.ownContainerInProgress
+            || ownSandboxTransaction.isRunning || nativeOwnWrite.isRunning {
+            return "ANOTHER_TEST_IS_RUNNING"
+        }
+        return "NATIVE_SELF_SANDBOX_TEST_READY_NOT_PATCH_AUTHORIZATION"
     }
 
     /// Native read-only checks take precedence over older manual/TCP
