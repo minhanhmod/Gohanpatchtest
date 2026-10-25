@@ -6,7 +6,8 @@
 // Return code 0 does NOT prove the file was updated; Swift verifies the digest.
 typedef void (^GHOwnFixtureWriteFinishedBlock)(BOOL nativeAccepted,
                                                 int32_t nativeReturnCode,
-                                                NSString * _Nonnull nativeErrorCategory);
+                                                NSString * _Nonnull nativeErrorCategory,
+                                                NSString * _Nonnull nativeTraceHint);
 FOUNDATION_EXPORT void GHRunNativeOwnFixtureWrite(NSString *pairingPath,
                                                    NSString *fixtureRoot,
                                                    GHOwnFixtureWriteFinishedBlock finished);

@@ -11,6 +11,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
     @Published private(set) var resultCode = "V46_NOT_TESTED"
     @Published private(set) var nativeReturnCode = "NOT_RUN"
     @Published private(set) var nativeErrorCategory = "NOT_RUN"
+    @Published private(set) var nativeTraceHint = "NOT_RUN"
     @Published private(set) var baselineVerified = false
     @Published private(set) var stagingSHA256Verified = false
     @Published private(set) var backupVerified = false
@@ -44,6 +45,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
         cleanupVerified = false
         nativeReturnCode = "NOT_RUN"
         nativeErrorCategory = "NOT_RUN"
+        nativeTraceHint = "NOT_RUN"
 
         let fm = FileManager.default
         let revision = vault.credentialRevision
@@ -100,8 +102,9 @@ final class GHV46NativeWriteReadiness: ObservableObject {
 
             // Native code rechecks the exact self-sandbox root and only accepts
             // stage/gh_v46_fixture.dat -> target/gh_v46_fixture.dat.
-            GHRunNativeOwnFixtureWrite(pairingPath, root.path) { [self] accepted, rc, errorCategory in
+            GHRunNativeOwnFixtureWrite(pairingPath, root.path) { [self] accepted, rc, errorCategory, traceHint in
                 self.nativeErrorCategory = errorCategory
+                self.nativeTraceHint = traceHint
                 self.nativeReturnCode = String(rc)
                 // Verify the native writer has NOT replaced our destination with
                 // a symlink or redirected its parent before any Foundation write.
@@ -151,6 +154,7 @@ final class GHV46NativeWriteReadiness: ObservableObject {
          "Writer: AIRLIFT_NATIVE_al_exploit_write_dir_SELF_ONLY",
          "Native rc: \(nativeReturnCode)",
          "Native error class (redacted): \(nativeErrorCategory)",
+         "Native trace hint (redacted): \(nativeTraceHint)",
          "Local staging SHA256 verified: \(stagingSHA256Verified ? "yes" : "no")",
          "Baseline verified: \(baselineVerified ? "yes" : "no")",
          "Backup verified: \(backupVerified ? "yes" : "no")",
