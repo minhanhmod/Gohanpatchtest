@@ -157,6 +157,7 @@ struct ContentView: View {
     @AppStorage("GooHanThemeHex") private var themeHex = "#FF4757"
     @AppStorage("GHPatchEnginePreference") private var enginePreference = GHEnginePreference.automatic.rawValue
     @AppStorage("GHLocalDevUserConfirmed") private var localDevUserConfirmed = false
+    @AppStorage("GHAppNewRouteTrialEnabled") private var appNewRouteTrialEnabled = false
     @AppStorage("GHFinalTestBeta5Tunnel") private var beta5TunnelObserved = false
     @AppStorage("GHFinalTestBeta5Pairing") private var beta5PairingObserved = false
     @AppStorage("GHFinalTestBeta5Patch") private var beta5PatchObserved = false
@@ -473,6 +474,14 @@ struct ContentView: View {
     private var settingsNativeFFISection: some View {
         Text("iOS 27 • AirLift Session + Container Test v4.4")
             .font(.headline)
+        Text("v4.6.5 — thử chọn tuyến LocalDev theo AppNew (tắt mặc định). Đây chỉ thay đổi IP ưu tiên của AirLiftFFI để so sánh Session rc=0/1, không cấp thêm quyền truy cập.")
+            .font(.caption2)
+            .foregroundColor(.secondary)
+        Toggle("Thử định tuyến AirLift theo AppNew", isOn: $appNewRouteTrialEnabled)
+            .font(.footnote)
+            .disabled(pairingSession.sessionInProgress || pairingSession.ownContainerInProgress || nativeOwnWrite.isRunning)
+        Text("AppNew route: " + (appNewRouteTrialEnabled ? "ENABLED_CANDIDATES_ONLY" : "DISABLED_VENDOR_DEFAULTS"))
+            .font(.caption2.monospaced())
         Text("FFI đã liên kết. v4.4 yêu cầu mã native rc=0 và sự kiện syslog, sau đó kiểm tra đường dẫn container của chính GooHan (chỉ đọc). Không ghi Patch.")
             .font(.caption2)
             .foregroundColor(.secondary)
@@ -487,6 +496,7 @@ struct ContentView: View {
             .font(.caption.monospaced())
             .textSelection(.enabled)
         Button(pairingSession.pairingInProgress ? "Đang chờ ghép đôi native…" : "Bắt đầu ghép đôi trực tiếp (AirLift)") {
+            GHSetAppNewRouteMode(appNewRouteTrialEnabled)
             pairingSession.start(vault: pairingVault)
         }
         .disabled(pairingSession.pairingInProgress || pairingSession.sessionInProgress || pairingSession.ownContainerInProgress)
@@ -504,6 +514,7 @@ struct ContentView: View {
             .font(.caption2)
             .foregroundColor(.secondary)
         Button(pairingSession.sessionInProgress ? "Đang truy vấn chỉ đọc…" : "Kiểm tra phiên AirLift (không ghi dữ liệu)") {
+            GHSetAppNewRouteMode(appNewRouteTrialEnabled)
             pairingSession.verifySelfReadOnly(vault: pairingVault)
         }
         .buttonStyle(.bordered)
@@ -511,11 +522,15 @@ struct ContentView: View {
         Text("Session: " + pairingSession.sessionCode)
             .font(.caption.monospaced())
             .textSelection(.enabled)
+        Text("Session error class: " + pairingSession.sessionErrorClass)
+            .font(.caption2.monospaced())
+            .textSelection(.enabled)
         Text("Native rc: " + pairingSession.nativeSessionReturnCode)
             .font(.caption2.monospaced())
         Text("Session strict pass: " + (pairingSession.sessionValid(for: pairingVault) ? "YES" : "NO"))
             .font(.caption2.monospaced())
         Button(pairingSession.ownContainerInProgress ? "Đang tìm container GooHan…" : "Kiểm tra container GooHan (AirLift, chỉ đọc)") {
+            GHSetAppNewRouteMode(appNewRouteTrialEnabled)
             pairingSession.testOwnContainerReadOnly(vault: pairingVault)
         }
         .buttonStyle(.bordered)
@@ -588,6 +603,7 @@ struct ContentView: View {
         Toggle("Tôi đồng ý chạy phép thử native trên dữ liệu thử nghiệm của GooHan", isOn: $nativeOwnWriteAcknowledged)
             .font(.footnote)
         Button(nativeOwnWrite.isRunning ? "Đang gọi AirLift native…" : "Chạy Native Write → SHA-256 → Restore (GooHan only)") {
+            GHSetAppNewRouteMode(appNewRouteTrialEnabled)
             nativeOwnWrite.run(vault: pairingVault, nativeSession: pairingSession,
                                v45: ownSandboxTransaction)
         }
@@ -743,6 +759,7 @@ struct ContentView: View {
             + "\nLocalDev TCP probe: " + localDevProbe.statusCode
             + "\nLocalDev TCP routes: " + localDevProbe.routeSummary
             + "\nLocalDev last tested at: " + localDevProbe.completedAt
+            + "\nAppNew route trial: " + (appNewRouteTrialEnabled ? "ENABLED_CANDIDATES_ONLY" : "DISABLED_VENDOR_DEFAULTS")
             + "\nNative AirLift FFI link-only test: " + nativeFFITest.statusCode
             + "\nPairing local vault: " + pairingVault.statusCode
             + "\n" + pairingSession.safeReport(for: pairingVault)

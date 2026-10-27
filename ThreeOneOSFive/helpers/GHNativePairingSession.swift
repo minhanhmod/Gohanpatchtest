@@ -83,6 +83,8 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
         })
     }
 
+    @Published private(set) var sessionErrorClass = "NOT_TESTED"
+
     func verifySelfReadOnly(vault: GHPairingVault) {
         guard inScope else { sessionCode = "BUILD_OUTSIDE_TEST_SCOPE"; return }
         guard !sessionInProgress && !pairingInProgress && !ownContainerInProgress else { return }
@@ -92,14 +94,16 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
         sessionInProgress = true
         invalidateSessionState()
         sessionCode = "READ_ONLY_SYSLOG_SESSION_RUNNING"
+        sessionErrorClass = "RUNNING"
         let testedCredentialRevision = vault.credentialRevision
-        GHRunNativeReadOnlySessionProbe(path) { [weak self] succeeded, rc in
+        GHRunNativeReadOnlySessionProbe(path) { [weak self] succeeded, rc, errorClass in
             guard let self else { return }
             self.sessionInProgress = false
             self.lastSessionAt = ISO8601DateFormatter().string(from: Date())
             // Require both native rc == 0 and a real event. An event alone
             // was incorrectly considered sufficient in v4.3.
             self.nativeSessionReturnCode = String(rc)
+            self.sessionErrorClass = errorClass
             self.sessionCode = GHSessionAssessment.status(receivedEvent: succeeded, returnCode: rc)
             self.sessionPassed = GHSessionAssessment.passed(receivedEvent: succeeded, returnCode: rc)
                 && testedCredentialRevision == vault.credentialRevision
@@ -225,6 +229,7 @@ final class GHNativePairingSession: NSObject, ObservableObject, NetServiceDelega
          "Pairing Bonjour: \(bonjourCode)",
          "Native read-only session: \(sessionCode)",
          "Session native rc: \(nativeSessionReturnCode)",
+         "Session native error class (redacted): \(sessionErrorClass)",
          "Session strict pass (rc0 + event + unchanged credential): \(sessionValid(for: vault) ? "yes" : "no")",
          "Session last checked: \(lastSessionAt)",
          "Native self-container lookup: \(ownContainerCode)",

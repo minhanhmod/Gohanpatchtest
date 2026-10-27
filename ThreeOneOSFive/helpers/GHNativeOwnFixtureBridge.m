@@ -1,4 +1,5 @@
 #import "GHNativeOwnFixtureBridge.h"
+#import "GHNativePairingBridge.h"
 #import <airlift.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -202,12 +203,18 @@ void GHRunNativeOwnFixtureWrite(NSString *pairingPath,
             char *nativeError = NULL;
             GHNativeTrace trace = {0};
             pthread_mutex_init(&trace.lock, NULL);
-            rc = al_exploit_write_dir(pairing.UTF8String,
-                                      staging.UTF8String,
-                                      destination.UTF8String,
-                                      gh_redacted_native_trace, &trace, &nativeError);
+            int32_t routeRC = GHApplyAppNewRouteHints();
+            if (routeRC == 0) {
+                rc = al_exploit_write_dir(pairing.UTF8String,
+                                          staging.UTF8String,
+                                          destination.UTF8String,
+                                          gh_redacted_native_trace, &trace, &nativeError);
+                errorClass = gh_native_error_class(nativeError, rc);
+            } else {
+                rc = -41;
+                errorClass = @"AL_ERROR_HOST_ROUTING_FAILED";
+            }
             // Collect allowlisted signals BEFORE releasing native memory.
-            errorClass = gh_native_error_class(nativeError, rc);
             traceSummary = gh_trace_summary(&trace);
             pthread_mutex_destroy(&trace.lock);
             if (nativeError) { al_string_free(nativeError); }

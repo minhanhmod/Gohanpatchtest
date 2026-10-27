@@ -6,7 +6,16 @@
 typedef void (^GHPairReadyBlock)(NSString *serviceID, uint16_t port, NSDictionary<NSString *, NSData *> *txt);
 typedef void (^GHPairPINBlock)(NSString *pin);
 typedef void (^GHPairFinishedBlock)(BOOL nativeSuccess, NSString *localResultPath, int32_t nativeReturnCode);
-typedef void (^GHSessionFinishedBlock)(BOOL querySucceeded, int32_t nativeReturnCode);
+typedef void (^GHSessionFinishedBlock)(BOOL querySucceeded,
+                                       int32_t nativeReturnCode,
+                                       NSString * _Nonnull redactedErrorClass);
+
+// AppNew-inspired opt-in local device host candidate routing.
+// Changes only the vendor's RSD target host preference, never privileges or
+// authorizes access to an application container.
+FOUNDATION_EXPORT void GHSetAppNewRouteMode(BOOL enabled);
+FOUNDATION_EXPORT int32_t GHApplyAppNewRouteHints(void);
+FOUNDATION_EXPORT BOOL GHAppNewRouteModeEnabled(void);
 
 FOUNDATION_EXPORT void GHStartNativeOnDevicePairing(NSString *outputPath,
                                                       GHPairReadyBlock ready,

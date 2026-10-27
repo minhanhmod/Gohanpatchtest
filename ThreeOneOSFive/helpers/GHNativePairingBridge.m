@@ -3,6 +3,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 @interface GHPairCallbackContext : NSObject
 @property (nonatomic, copy) GHPairReadyBlock ready;
@@ -10,6 +11,54 @@
 @end
 @implementation GHPairCallbackContext
 @end
+
+// Adapted from the target-host selection concept in AppNew's AirliftBridge.
+// Only fixed LocalDev private/loopback candidates are accepted; never send
+// dynamically discovered Wi-Fi addresses or identifiers to the report.
+static atomic_bool gh_appnew_routes_enabled = false;
+
+void GHSetAppNewRouteMode(BOOL enabled) {
+    atomic_store(&gh_appnew_routes_enabled, enabled);
+    if (!enabled) { al_clear_target_hosts(); }
+}
+
+BOOL GHAppNewRouteModeEnabled(void) {
+    return atomic_load(&gh_appnew_routes_enabled);
+}
+
+int32_t GHApplyAppNewRouteHints(void) {
+    if (!atomic_load(&gh_appnew_routes_enabled)) { return 0; }
+    // Those are candidate hosts, NOT an assertion of a verified tunnel.
+    const char *hosts[] = {"10.7.0.1", "10.7.1.1", "127.0.0.1"};
+    int32_t rc = al_set_target_host(hosts[0]);
+    if (rc != 0) { return rc; }
+    return al_set_target_hosts(hosts, sizeof(hosts) / sizeof(hosts[0]));
+}
+
+// Out-error strings from Rust can contain pairing details or absolute paths.
+// Report only allowlisted categories, never the text itself.
+static NSString *gh_session_redacted_error(const char *raw, int32_t rc) {
+    if (rc == 0) { return @"AL_SESSION_ERROR_NONE"; }
+    if (!raw || !raw[0]) { return @"AL_SESSION_ERROR_NOT_PROVIDED"; }
+    size_t bytes = strnlen(raw, 4096);
+    if (bytes == 4096) { return @"AL_SESSION_ERROR_TOO_LONG"; }
+    NSString *str = [[NSString alloc] initWithBytes:raw length:bytes encoding:NSUTF8StringEncoding];
+    if (!str) { return @"AL_SESSION_ERROR_ENCODING"; }
+    NSString *lower = str.lowercaseString;
+    for (NSString *token in @[@"pairing", @"credential", @"trust", @"authentication", @"handshake"]) {
+        if ([lower containsString:token]) { return @"AL_SESSION_PAIRING_OR_AUTH"; }
+    }
+    for (NSString *token in @[@"rsd", @"tunnel", @"connect", @"timeout", @"network", @"transport"]) {
+        if ([lower containsString:token]) { return @"AL_SESSION_TUNNEL_OR_NETWORK"; }
+    }
+    for (NSString *token in @[@"service", @"syslog", @"coredevice", @"lockdown"]) {
+        if ([lower containsString:token]) { return @"AL_SESSION_DEVICE_SERVICE"; }
+    }
+    for (NSString *token in @[@"permission", @"denied", @"not permitted", @"unauthorized"]) {
+        if ([lower containsString:token]) { return @"AL_SESSION_ACCESS_DENIED"; }
+    }
+    return @"AL_SESSION_UNCLASSIFIED";
+}
 
 static void gh_pair_host_ready(void *ctx, const char *serviceID, uint16_t port,
                                const char *const *keys, const char *const *vals, size_t count) {
@@ -89,7 +138,7 @@ void GHRunNativeReadOnlySessionProbe(NSString *pairingPath,
     if (pairingPath.length == 0 || !finished) { return; }
     bool wasActive = false;
     if (!atomic_compare_exchange_strong(&gh_stream_active, &wasActive, true)) {
-        dispatch_async(dispatch_get_main_queue(), ^{ finished(NO, -2); });
+        dispatch_async(dispatch_get_main_queue(), ^{ finished(NO, -2, @"AL_SESSION_ALREADY_RUNNING"); });
         return;
     }
     unsigned long generation = atomic_fetch_add(&gh_stream_generation, 1) + 1;
@@ -98,7 +147,7 @@ void GHRunNativeReadOnlySessionProbe(NSString *pairingPath,
     GHStreamProbeContext *context = calloc(1, sizeof(GHStreamProbeContext));
     if (!context) {
         atomic_store(&gh_stream_active, false);
-        dispatch_async(dispatch_get_main_queue(), ^{ finalBlock(NO, -3); });
+        dispatch_async(dispatch_get_main_queue(), ^{ finalBlock(NO, -3, @"AL_SESSION_ALLOCATION_FAILED"); });
         return;
     }
     atomic_init(&context->sawLine, false);
@@ -113,13 +162,18 @@ void GHRunNativeReadOnlySessionProbe(NSString *pairingPath,
     });
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         char *error = NULL;
-        int32_t rc = al_syslog_stream_start(pairPath.UTF8String, gh_stream_line, context, &error);
+        int32_t routeRC = GHApplyAppNewRouteHints();
+        int32_t rc = routeRC == 0
+            ? al_syslog_stream_start(pairPath.UTF8String, gh_stream_line, context, &error)
+            : -41;
         BOOL observed = atomic_load(&context->sawLine);
-        if (error) { al_string_free(error); } // Do not surface private device details.
+        NSString *errorClass = (routeRC != 0) ? @"AL_SESSION_HOST_ROUTING_FAILED"
+            : gh_session_redacted_error(error, rc);
+        if (error) { al_string_free(error); } // Never expose credentials or paths.
         free(context);
         atomic_store(&gh_stream_active, false);
         dispatch_async(dispatch_get_main_queue(), ^{
-            finalBlock(observed, rc);
+            finalBlock(observed, rc, errorClass);
         });
     });
 }
@@ -145,8 +199,11 @@ void GHRunNativeOwnContainerReadProbe(NSString *pairingPath,
         char *errorText = NULL;
         // This API discovers the app data container, it does not invoke any
         // AirTraffic exploit/write or access the contents of another app.
-        int32_t rc = al_find_app_container(localPair.UTF8String, bundleID.UTF8String,
-                                           NULL, NULL, &resultPath, &errorText);
+        int32_t routeRC = GHApplyAppNewRouteHints();
+        int32_t rc = routeRC == 0
+            ? al_find_app_container(localPair.UTF8String, bundleID.UTF8String,
+                                    NULL, NULL, &resultPath, &errorText)
+            : -41;
         BOOL matchesCurrentSandbox = NO;
         BOOL canReadCurrentSandbox = NO;
         if (rc == 0 && resultPath != NULL) {
