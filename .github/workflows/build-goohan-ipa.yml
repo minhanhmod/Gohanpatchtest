@@ -42,6 +42,7 @@ jobs:
           python3 tests/test_native_session_v44.py
           python3 tests/test_own_sandbox_v45.py
           python3 tests/test_independent_sandbox_gate_v464.py
+          python3 tests/test_appnew_route_trial_v465.py
           python3 tests/test_native_own_fixture_v46.py
           python3 tests/test_native_error_class_v461.py
           python3 tests/test_native_error_class_v462.py
