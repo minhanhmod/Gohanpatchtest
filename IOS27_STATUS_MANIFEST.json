@@ -1,7 +1,7 @@
 {
-  "name": "GooHan Patch iOS27 Native Own-Sandbox AirLift Write Test",
-  "version": "4.6-own-sandbox-native-write-test",
-  "release_status": "EXPERIMENTAL_NATIVE_OWN_APP_ONLY_NOT_THIRD_PARTY_PATCH",
+  "name": "GooHan Patch iOS27 Redacted Native Connection Trace v4.6.6",
+  "version": "4.6.6-redacted-native-trace-counters",
+  "release_status": "EXPERIMENTAL_DIAGNOSTICS_ONLY_NO_THIRD_PARTY_PATCH",
   "tested": {
     "linux_swift_coordinator_smoke": true,
     "linux_swift_readiness_tests": true,
@@ -24,5 +24,7 @@
   "v45_own_sandbox_fault_injection_rollback": true,
   "v45_native_airlift_write_verified": false,
   "v46_native_airlift_self_sandbox_test": true,
-  "v46_native_airlift_write_verified_on_device": false
+  "v46_native_airlift_write_verified_on_device": false,
+  "v466_bounded_stage_trace_counters": true,
+  "v466_native_ffi_failures_resolved": false
 }

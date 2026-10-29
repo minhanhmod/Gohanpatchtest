@@ -106,9 +106,15 @@ static NSString *gh_native_error_class(const char *nativeError, int32_t rc) {
 // Optional FFI trace callback. It stores ONLY allowlisted stage hints and a
 // capped event count. Raw log text may include pairing credentials or paths;
 // it is never retained, printed, uploaded, or passed to Swift.
+// Keep only bounded aggregate counters. Never store a native callback line.
+// Class IDs: 0=other, 1=auth, 2=network, 3=device service,
+// 4=permission, 5=native write. These are clues, not proven root causes.
 typedef struct {
     pthread_mutex_t lock;
     uint32_t events;
+    uint32_t categories[6];
+    uint32_t transitions;
+    int firstHint;
     int lastHint;
 } GHNativeTrace;
 
@@ -144,28 +150,59 @@ static void gh_redacted_native_trace(void *context, const char *message) {
     if (!context) { return; }
     GHNativeTrace *trace = (GHNativeTrace *)context;
     int hint = gh_native_trace_hint(message);
+    if (hint < 0 || hint > 5) { hint = 0; }
     pthread_mutex_lock(&trace->lock);
-    if (trace->events < 9999) { trace->events++; }
-    if (hint != 0) { trace->lastHint = hint; }
+    if (trace->events < 9999) {
+        if (trace->events == 0) { trace->firstHint = hint; }
+        else if (trace->lastHint != hint && trace->transitions < 9999) {
+            trace->transitions++;
+        }
+        trace->events++;
+        if (trace->categories[hint] < 9999) { trace->categories[hint]++; }
+        trace->lastHint = hint;
+    }
     pthread_mutex_unlock(&trace->lock);
 }
 
+static NSString *gh_trace_category(int hint) {
+    switch (hint) {
+        case 1: return @"AUTH";
+        case 2: return @"NETWORK";
+        case 3: return @"SERVICE";
+        case 4: return @"PERMISSION";
+        case 5: return @"WRITE";
+        default: return @"OTHER";
+    }
+}
+
+// Existing hint prefix preserved for the v4.6.3 UI/tests, with v4.6.6
+// aggregate counters appended. Every token is allowlisted; no raw text.
 static NSString *gh_trace_summary(GHNativeTrace *trace) {
-    uint32_t events = 0;
-    int hint = 0;
+    uint32_t events, counts[6], transitions;
+    int first, last;
     pthread_mutex_lock(&trace->lock);
     events = trace->events;
-    hint = trace->lastHint;
+    memcpy(counts, trace->categories, sizeof(counts));
+    transitions = trace->transitions;
+    first = trace->firstHint;
+    last = trace->lastHint;
     pthread_mutex_unlock(&trace->lock);
-    if (events == 0) { return @"AL_TRACE_NO_LOG_CALLBACKS"; }
-    switch (hint) {
-        case 1: return @"AL_TRACE_HINT_PAIRING_OR_AUTH";
-        case 2: return @"AL_TRACE_HINT_TUNNEL_OR_NETWORK";
-        case 3: return @"AL_TRACE_HINT_DEVICE_SERVICE";
-        case 4: return @"AL_TRACE_HINT_PERMISSION";
-        case 5: return @"AL_TRACE_HINT_NATIVE_WRITE";
-        default: return @"AL_TRACE_LOGS_SEEN_UNCLASSIFIED";
+    NSString *hint;
+    if (events == 0) { hint = @"AL_TRACE_NO_LOG_CALLBACKS"; }
+    else {
+        switch (last) {
+            case 1: hint = @"AL_TRACE_HINT_PAIRING_OR_AUTH"; break;
+            case 2: hint = @"AL_TRACE_HINT_TUNNEL_OR_NETWORK"; break;
+            case 3: hint = @"AL_TRACE_HINT_DEVICE_SERVICE"; break;
+            case 4: hint = @"AL_TRACE_HINT_PERMISSION"; break;
+            case 5: hint = @"AL_TRACE_HINT_NATIVE_WRITE"; break;
+            default: hint = @"AL_TRACE_LOGS_SEEN_UNCLASSIFIED"; break;
+        }
     }
+    return [NSString stringWithFormat:
+        @"%@|AL_TRACE_EVENTS_%u|AL_TRACE_FIRST_%@|AL_TRACE_LAST_%@|AL_TRACE_COUNTS_AUTH_%u_NET_%u_SERVICE_%u_PERMISSION_%u_WRITE_%u_OTHER_%u|AL_TRACE_TRANSITIONS_%u",
+        hint, events, gh_trace_category(first), gh_trace_category(last),
+        counts[1], counts[2], counts[3], counts[4], counts[5], counts[0], transitions];
 }
 
 void GHRunNativeOwnFixtureWrite(NSString *pairingPath,

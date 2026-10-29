@@ -12,6 +12,9 @@ final class GHV46NativeWriteReadiness: ObservableObject {
     @Published private(set) var nativeReturnCode = "NOT_RUN"
     @Published private(set) var nativeErrorCategory = "NOT_RUN"
     @Published private(set) var nativeTraceHint = "NOT_RUN"
+    @Published private(set) var nativeTraceBreakdown = "NOT_RUN"
+    @Published private(set) var nativePhase = "NOT_STARTED"
+    @Published private(set) var nativeDurationMs = "NOT_RUN"
     @Published private(set) var baselineVerified = false
     @Published private(set) var stagingSHA256Verified = false
     @Published private(set) var backupVerified = false
@@ -46,6 +49,9 @@ final class GHV46NativeWriteReadiness: ObservableObject {
         nativeReturnCode = "NOT_RUN"
         nativeErrorCategory = "NOT_RUN"
         nativeTraceHint = "NOT_RUN"
+        nativeTraceBreakdown = "NOT_RUN"
+        nativePhase = "FIXTURE_PREPARATION"
+        nativeDurationMs = "NOT_RUN"
 
         let fm = FileManager.default
         let revision = vault.credentialRevision
@@ -98,13 +104,22 @@ final class GHV46NativeWriteReadiness: ObservableObject {
             }
             isRunning = true
             resultCode = "V46_NATIVE_AIRLIFT_WRITE_RUNNING"
+            nativePhase = "FFI_CALL_IN_PROGRESS"
+            let nativeStartedAt = Date()
             let expectedCanonicalTarget = targetFile.resolvingSymlinksInPath().standardizedFileURL.path
 
             // Native code rechecks the exact self-sandbox root and only accepts
             // stage/gh_v46_fixture.dat -> target/gh_v46_fixture.dat.
             GHRunNativeOwnFixtureWrite(pairingPath, root.path) { [self] accepted, rc, errorCategory, traceHint in
                 self.nativeErrorCategory = errorCategory
-                self.nativeTraceHint = traceHint
+                let redactedTrace = traceHint.components(separatedBy: "|")
+                self.nativeTraceHint = redactedTrace.first ?? "AL_TRACE_NOT_REPORTED"
+                self.nativeTraceBreakdown = redactedTrace.dropFirst().joined(separator: "\n")
+                if self.nativeTraceBreakdown.isEmpty {
+                    self.nativeTraceBreakdown = "AL_TRACE_COUNTERS_UNAVAILABLE"
+                }
+                self.nativeDurationMs = String(Int(Date().timeIntervalSince(nativeStartedAt) * 1000))
+                self.nativePhase = rc == 0 ? "FFI_RETURNED_RC_0" : "FFI_RETURNED_NONZERO"
                 self.nativeReturnCode = String(rc)
                 // Verify the native writer has NOT replaced our destination with
                 // a symlink or redirected its parent before any Foundation write.
@@ -139,10 +154,14 @@ final class GHV46NativeWriteReadiness: ObservableObject {
                     pairingUnchanged: revision == vault.credentialRevision,
                     targetUnchanged: targetUnchanged
                 )
+                self.nativePhase = self.restoreVerified
+                    ? (self.nativeWriteVerified ? "COMPLETE_NATIVE_VERIFIED_RESTORED" : "COMPLETE_NATIVE_UNVERIFIED_RESTORED")
+                    : "COMPLETE_RESTORE_UNVERIFIED"
                 self.lastCheckedAt = ISO8601DateFormatter().string(from: Date())
                 self.isRunning = false
             }
         } catch {
+            nativePhase = "LOCAL_FIXTURE_PREPARATION_FAILED"
             resultCode = "V46_FIXTURE_PREPARATION_FAILED"
             lastCheckedAt = ISO8601DateFormatter().string(from: Date())
         }
@@ -155,6 +174,9 @@ final class GHV46NativeWriteReadiness: ObservableObject {
          "Native rc: \(nativeReturnCode)",
          "Native error class (redacted): \(nativeErrorCategory)",
          "Native trace hint (redacted): \(nativeTraceHint)",
+         "Native trace counters (redacted): \(nativeTraceBreakdown)",
+         "Native phase: \(nativePhase)",
+         "Native call duration ms: \(nativeDurationMs)",
          "Local staging SHA256 verified: \(stagingSHA256Verified ? "yes" : "no")",
          "Baseline verified: \(baselineVerified ? "yes" : "no")",
          "Backup verified: \(backupVerified ? "yes" : "no")",
